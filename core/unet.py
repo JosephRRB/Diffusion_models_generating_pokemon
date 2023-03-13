@@ -1,6 +1,6 @@
-import torch as th
+import torch as pt
 import torch.nn as nn
-
+import math
 
 class BottleneckConvBlock(nn.Module):
     def __init__(self, in_c, out_c, t_emb_dim):
@@ -128,13 +128,13 @@ class DecoderLayer(nn.Module):
 
     def forward(self, img, skip_img, t_emb):
         assert img.shape == skip_img.shape
-        imgs = th.cat([img, skip_img], dim=1)
+        imgs = pt.cat([img, skip_img], dim=1)
         hidden = self.upsample(imgs, t_emb)
         hidden = self.attention(hidden)
         return self.conv(hidden, t_emb)
 
 
-class UNet64x64x3(nn.Module):
+class UNet3x64x64(nn.Module):
     def __init__(self, t_emb_dim=256):
         super().__init__()
         self.t_emb_dim = t_emb_dim
@@ -170,7 +170,7 @@ class UNet64x64x3(nn.Module):
         )
 
     def forward(self, imgs, ts):
-        t_embs = _embed_time_step(ts, embedding_dim=self.t_emb_dim)
+        t_embs = self._embed_time_step(ts, embedding_dim=self.t_emb_dim)
 
         hs = [self.in_conv(imgs)]
         for encoder in self.encoder_layers:
@@ -184,19 +184,19 @@ class UNet64x64x3(nn.Module):
             s = hs.pop()
             y = decoder(y, s, t_embs)
 
-        return self.out_conv(th.cat([y, hs[-1]], dim=1))
+        return self.out_conv(pt.cat([y, hs[-1]], dim=1))
 
+    @staticmethod
+    def _embed_time_step(ts, embedding_dim=256, n=10000):
+        half_dim = embedding_dim // 2
+        log_n = math.log(n)
 
-def _embed_time_step(ts, embedding_dim=256):
-    half_dim = embedding_dim // 2
-    log_n = 9.21
+        sin_emb_inds = pt.arange(0, half_dim, dtype=pt.float)
+        cos_emb_inds = pt.arange(0, half_dim + embedding_dim % 2, dtype=pt.float)
 
-    sin_emb_inds = th.arange(0, half_dim, dtype=th.float)
-    cos_emb_inds = th.arange(0, half_dim + embedding_dim % 2, dtype=th.float)
+        sin_embs = pt.sin(pt.exp(-log_n * sin_emb_inds / half_dim) * ts)
+        cos_embs = pt.cos(pt.exp(-log_n * cos_emb_inds / half_dim) * ts)
 
-    sin_embs = th.sin(th.exp(-log_n*sin_emb_inds/half_dim)*ts)
-    cos_embs = th.cos(th.exp(-log_n*cos_emb_inds/half_dim)*ts)
-
-    t_embs = th.cat([sin_embs, cos_embs], dim=-1)
-    return t_embs
+        t_embs = pt.cat([sin_embs, cos_embs], dim=-1)
+        return t_embs
 

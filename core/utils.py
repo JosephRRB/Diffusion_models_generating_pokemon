@@ -18,8 +18,8 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, index):
         image_path = self.image_filenames[index]
-        image = read_image(image_path, mode=ImageReadMode.RGB)
-        # image = Image.open(image_path).convert('RGB')
+        # image = read_image(image_path, mode=ImageReadMode.RGB)
+        image = Image.open(image_path).convert('RGB')
         if self.transform_fn:
             image = self.transform_fn(image)
         return image
