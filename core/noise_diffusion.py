@@ -4,7 +4,9 @@ import math
 
 class NoisifyImage:
     def __init__(self, t_max=1000, s=0.008, beta_max=0.999):
-        self.alph_bars, self.betas = self._get_cosine_noise_schedule(t_max, s, beta_max)
+        self.alph_bars, self.betas = self._get_cosine_noise_schedule(
+            t_max=t_max, s=s, beta_max=beta_max
+        )
 
     @staticmethod
     def _get_cosine_noise_schedule(t_max=1000, s=0.008, beta_max=0.999):
