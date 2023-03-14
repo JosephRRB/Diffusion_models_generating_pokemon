@@ -31,11 +31,15 @@ class Runner:
 
             pbar.set_postfix(MSE=loss.item())
 
+    def train(self, n_epochs=10):
+        for i in range(n_epochs):
+            self._training_step()
+
     def sample(self, n_samples=2):
         self.unet.eval()
         with pt.no_grad():
             img = pt.randn((n_samples, 3, self.image_size, self.image_size))
-            for t in reversed(range(1, self.t_max)):
+            for t in tqdm(reversed(range(1, self.t_max))):
                 ts = pt.ones(n_samples, dtype=pt.int64) * t
                 pred_noise = self.unet(img, ts.view(-1, 1))
                 alph_bar = self.noisify.alph_bars[ts][:, None, None, None]
