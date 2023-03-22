@@ -135,18 +135,21 @@ class DecoderLayer(nn.Module):
 
 
 class UNet3x64x64(nn.Module):
-    def __init__(self, t_emb_dim=256):
+    def __init__(self, t_emb_dim=256, device="cuda"):
         super().__init__()
+        self.device = device
         self.t_emb_dim = t_emb_dim
         img_sizes = [64, 32, 16, 8, 4]
         channels = [16, 32, 64, 128, 256]
         enc_in_cs = channels[:-1]
         enc_out_cs = channels[1:]
 
-        self.in_conv = nn.Conv2d(3, enc_in_cs[0], kernel_size=3, padding=1, bias=False)
+        self.in_conv = nn.Conv2d(
+            3, enc_in_cs[0], kernel_size=3, padding=1, bias=False
+        ).to(self.device)
 
         self.encoder_layers = [
-            EncoderLayer(in_c, out_c, self.t_emb_dim, in_img_size)
+            EncoderLayer(in_c, out_c, self.t_emb_dim, in_img_size).to(self.device)
             for in_c, out_c, in_img_size in zip(
                 enc_in_cs, enc_out_cs, img_sizes[:-1]
             )
@@ -154,10 +157,10 @@ class UNet3x64x64(nn.Module):
 
         self.mid_layer = MiddleLayer(
             img_c=enc_out_cs[-1], t_emb_dim=self.t_emb_dim, img_size=img_sizes[-1]
-        )
+        ).to(self.device)
 
         self.decoder_layers = [
-            DecoderLayer(in_c, out_c, self.t_emb_dim, in_img_size)
+            DecoderLayer(in_c, out_c, self.t_emb_dim, in_img_size).to(self.device)
             for in_c, out_c, in_img_size in zip(
                 enc_out_cs[::-1], enc_in_cs[::-1], img_sizes[::-1][:-1]
             )
@@ -167,7 +170,7 @@ class UNet3x64x64(nn.Module):
             nn.GroupNorm(1, 2 * enc_in_cs[0]),
             nn.GELU(),
             nn.Conv2d(2 * enc_in_cs[0], 3, kernel_size=3, padding=1, bias=False)
-        )
+        ).to(self.device)
 
     def forward(self, imgs, ts):
         t_embs = self._embed_time_step(ts, embedding_dim=self.t_emb_dim)
@@ -186,16 +189,18 @@ class UNet3x64x64(nn.Module):
 
         return self.out_conv(pt.cat([y, hs[-1]], dim=1))
 
-    @staticmethod
-    def _embed_time_step(ts, embedding_dim=256, n=10000):
+    def _embed_time_step(self, ts, embedding_dim=256, n=10000):
         half_dim = embedding_dim // 2
         log_n = math.log(n)
 
         sin_emb_inds = pt.arange(0, half_dim, dtype=pt.float)
         cos_emb_inds = pt.arange(0, half_dim + embedding_dim % 2, dtype=pt.float)
 
-        sin_embs = pt.sin(pt.exp(-log_n * sin_emb_inds / half_dim) * ts)
-        cos_embs = pt.cos(pt.exp(-log_n * cos_emb_inds / half_dim) * ts)
+        sin_freqs = pt.exp(-log_n * sin_emb_inds / half_dim).to(self.device)
+        cos_freqs = pt.exp(-log_n * cos_emb_inds / half_dim).to(self.device)
+
+        sin_embs = pt.sin(sin_freqs * ts)
+        cos_embs = pt.cos(cos_freqs * ts)
 
         t_embs = pt.cat([sin_embs, cos_embs], dim=-1)
         return t_embs

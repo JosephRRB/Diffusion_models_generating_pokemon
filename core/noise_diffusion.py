@@ -3,10 +3,12 @@ import math
 
 
 class NoisifyImage:
-    def __init__(self, t_max=1000, s=0.008, beta_max=0.999):
-        self.alph_bars, self.betas = self._get_cosine_noise_schedule(
+    def __init__(self, t_max=1000, s=0.008, beta_max=0.999, device="cuda"):
+        alph_bars, betas = self._get_cosine_noise_schedule(
             t_max=t_max, s=s, beta_max=beta_max
         )
+        self.alph_bars = alph_bars.to(device)
+        self.betas = betas.to(device)
 
     @staticmethod
     def _get_cosine_noise_schedule(t_max=1000, s=0.008, beta_max=0.999):
