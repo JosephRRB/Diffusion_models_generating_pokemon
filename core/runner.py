@@ -1,6 +1,7 @@
 from tqdm import tqdm
 
 import torch as pt
+from torch.utils.tensorboard import SummaryWriter
 
 from core.noise_diffusion import NoisifyImage
 from core.unet import UNet3x64x64
@@ -17,31 +18,39 @@ class Runner:
         self.image_loader = _create_image_loader(batch_size=batch_size, image_size=image_size)
         self.mse_loss = pt.nn.MSELoss()
         self.optimizer = pt.optim.Adam(self.unet.parameters(), lr=lr)
+        self.logger = SummaryWriter()
 
     def _training_step(self):
-        pbar = tqdm(self.image_loader)
-        for img_batch in pbar:
+        losses = []
+        for img_batch in tqdm(self.image_loader):
+            self.optimizer.zero_grad()
+
             ts = pt.randint(self.t_max, (img_batch.shape[0],)).to(self.device)
             noisy_img_batch, noise = self.noisify.noisify_to_t(
                 img_batch.to(self.device), ts
             )
             pred_noise = self.unet(noisy_img_batch, ts.view(-1, 1))
-            loss = self.mse_loss(noise, pred_noise)
 
-            self.optimizer.zero_grad()
+            loss = self.mse_loss(noise, pred_noise)
             loss.backward()
+
             self.optimizer.step()
 
-            pbar.set_postfix(MSE=loss.item())
+            losses.append(loss.item())
 
-        return loss
+        return sum(losses) / len(losses)
 
     def train(self, n_epochs=10):
         for i in range(n_epochs):
-            loss = self._training_step()
+            epoch_ave_loss = self._training_step()
 
             if i % 5 == 0:
-                print(f"Iteration: {i}, Loss: {loss:.2f}")
+                print(f"Iteration: {i}, Ave Loss of Epoch:, {epoch_ave_loss:.4f}")
+
+            self.logger.add_scalar("Ave Loss", epoch_ave_loss, i)
+
+        self.logger.flush()
+        self.logger.close()
 
     def sample(self, n_samples=2):
         self.unet.eval()
