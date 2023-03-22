@@ -44,7 +44,7 @@ class Runner:
         for i in range(n_epochs):
             epoch_ave_loss = self._training_step()
 
-            if i % 5 == 0:
+            if i % 100 == 0:
                 print(f"Iteration: {i}, Ave Loss of Epoch:, {epoch_ave_loss:.4f}")
 
             self.logger.add_scalar("Ave Loss", epoch_ave_loss, i)
