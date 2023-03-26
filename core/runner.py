@@ -13,7 +13,7 @@ class Runner:
         self.t_max = t_max
         self.image_size = image_size
         self.device=device
-        self.noisify = NoisifyImage(t_max=t_max, device=self.device)
+        self.noisify = NoisifyImage(t_max=t_max, device=self.device, noise_schedule="linear", beta_min=1e-4, beta_max=0.02)
         self.unet = UNet3x64x64(t_emb_dim=t_emb_dim, device=self.device)
         self.image_loader = _create_image_loader(batch_size=batch_size, image_size=image_size)
         self.mse_loss = pt.nn.MSELoss()
