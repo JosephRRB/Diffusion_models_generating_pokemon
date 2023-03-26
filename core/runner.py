@@ -12,7 +12,7 @@ class Runner:
     def __init__(self, batch_size=2, image_size=64, t_max=1000, t_emb_dim=256, lr=0.0001, device="cuda"):
         self.t_max = t_max
         self.image_size = image_size
-        self.device=device
+        self.device = device
         self.noisify = NoisifyImage(t_max=t_max, device=self.device, noise_schedule="linear", beta_min=1e-4, beta_max=0.02)
         self.unet = UNet3x64x64(t_emb_dim=t_emb_dim, device=self.device)
         self.image_loader = _create_image_loader(batch_size=batch_size, image_size=image_size)
@@ -55,18 +55,16 @@ class Runner:
     def sample(self, n_samples=2):
         self.unet.eval()
         with pt.no_grad():
-            img = pt.randn((n_samples, 3, self.image_size, self.image_size)).to(self.device)
+            imgs = pt.randn((n_samples, 3, self.image_size, self.image_size)).to(self.device)
             for t in tqdm(reversed(range(1, self.t_max))):
                 ts = (pt.ones(n_samples, dtype=pt.int64) * t).to(self.device)
-                pred_noise = self.unet(img, ts.view(-1, 1))
-                alph_bar = self.noisify.alph_bars[ts][:, None, None, None]
-                beta = self.noisify.betas[ts][:, None, None, None]
+                pred_noise = self.unet(imgs, ts.view(-1, 1))
 
-                noise = pt.randn_like(img)
+                intermediate_noise = pt.randn_like(imgs)
                 if t == 1:
-                    noise = 0 * noise
-
-                img = (img - beta * pred_noise / pt.sqrt(1 - alph_bar)) / pt.sqrt(1 - beta) + pt.sqrt(beta) * noise
-
+                    intermediate_noise = 0 * intermediate_noise
+                imgs = self.noisify.denoise_at_t(
+                    imgs, ts, pred_noise, intermediate_noise
+                )
         self.unet.train()
-        return img
+        return imgs

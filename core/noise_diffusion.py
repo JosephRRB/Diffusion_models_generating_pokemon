@@ -39,3 +39,10 @@ class NoisifyImage:
         noisy_imgs = pt.sqrt(alph_bar_t) * imgs + pt.sqrt(1 - alph_bar_t) * noise
         return noisy_imgs, noise
 
+    def denoise_at_t(self, imgs, ts, pred_noise, intermediate_noise):
+        alph_bar = self.alph_bars[ts][:, None, None, None]
+        beta = self.betas[ts][:, None, None, None]
+        pred_mu = (imgs - beta * pred_noise / pt.sqrt(1 - alph_bar)) / pt.sqrt(1 - beta)
+
+        denoised_imgs = pred_mu + pt.sqrt(beta) * intermediate_noise
+        return denoised_imgs
